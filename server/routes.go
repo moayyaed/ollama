@@ -1228,7 +1228,7 @@ func chat(ctx context.Context, req api.ChatRequest) (chan any, error) {
 }
 
 func ChatCompletionsHandler(c *gin.Context) {
-	var req openai.Request
+	var req openai.ChatCompletionRequest
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1237,7 +1237,33 @@ func ChatCompletionsHandler(c *gin.Context) {
 
 	var messages []api.Message
 	for _, msg := range req.Messages {
-		messages = append(messages, api.Message{Role: msg.Role, Content: msg.Content})
+		switch content := msg.Content.(type) {
+		case string:
+			messages = append(messages, api.Message{Role: msg.Role, Content: content})
+		case []openai.Content:
+			var text string
+			var images []api.ImageData
+			for _, content := range content {
+				if content.Type == "image" {
+					if url := content.ImageURL; url != nil {
+						switch {
+						case strings.HasPrefix(url.URL, "data:image/jpeg;base64,"):
+							images = append(images, []byte(strings.TrimPrefix(url.URL, "data:image/jpeg;base64,")))
+						case strings.HasPrefix(url.URL, "data:image/png;base64,"):
+							images = append(images, []byte(strings.TrimPrefix(url.URL, "data:image/png;base64,")))
+						default:
+							c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "only base64-encoded data urls of jpg or png files are supported"})
+							return
+						}
+
+						images = append(images, []byte(url.URL))
+					}
+				} else if content.Type == "text" {
+					content.Text += strings.TrimSpace(content.Text)
+				}
+			}
+			messages = append(messages, api.Message{Role: msg.Role, Content: text, Images: images})
+		}
 	}
 
 	options := make(map[string]interface{})
@@ -1315,7 +1341,7 @@ func ChatCompletionsHandler(c *gin.Context) {
 	}
 
 	res.Message.Content = content
-	c.JSON(http.StatusOK, &openai.Response{
+	c.JSON(http.StatusOK, &openai.ChatCompletionResponse{
 		Id:                id,
 		Object:            "chat.completion",
 		Created:           res.CreatedAt.Unix(),
@@ -1354,10 +1380,10 @@ func streamEvents(c *gin.Context, ch chan any) {
 			return false
 		}
 
-		var chunk openai.Chunk
+		var chunk openai.ChatCompletionChunk
 		switch r := r.(type) {
 		case api.ChatResponse:
-			chunk = openai.Chunk{
+			chunk = openai.ChatCompletionChunk{
 				Id:                id,
 				Object:            "chat.completion.chunk",
 				Created:           time.Now().Unix(),

@@ -11,9 +11,19 @@ type ErrorResponse struct {
 	Error Error `json:"error"`
 }
 
+type ContentImage struct {
+	URL string `json:"url"`
+}
+
+type Content struct {
+	Type     string        `json:"type"`
+	Text     string        `json:"text,omitempty"`
+	ImageURL *ContentImage `json:"image_url,omitempty"`
+}
+
 type Message struct {
 	Role    string `json:"role"`
-	Content string `json:"content"`
+	Content any    `json:"content"`
 }
 
 type Choice struct {
@@ -38,7 +48,7 @@ type ResponseFormat struct {
 	Type string `json:"type"`
 }
 
-type Request struct {
+type ChatCompletionRequest struct {
 	Model            string
 	Messages         []Message       `json:"messages"`
 	Stream           bool            `json:"stream"`
@@ -52,7 +62,7 @@ type Request struct {
 	ResponseFormat   *ResponseFormat `json:"response_format"`
 }
 
-type Response struct {
+type ChatCompletionResponse struct {
 	Id                string   `json:"id"`
 	Object            string   `json:"object"`
 	Created           int64    `json:"created"`
@@ -62,7 +72,7 @@ type Response struct {
 	Usage             Usage    `json:"usage,omitempty"`
 }
 
-type Chunk struct {
+type ChatCompletionChunk struct {
 	Id                string        `json:"id"`
 	Object            string        `json:"object"`
 	Created           int64         `json:"created"`
